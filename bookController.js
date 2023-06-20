@@ -1,65 +1,95 @@
 const createError = require("http-errors");
+const Book = require("./bookModel");
 
-let books = [];
+// Return book listings
+exports.getBooks = async (req, res, next) => {
+  try {
+    const books = await Book.find();
+    res.send(books);
+  } catch (error) {
+    return next(createError(500, error.message));
+  }
+};
 
 // Add a book (Title, Author, Read/not read status, an ID)
-exports.addBook = (req, res) => {
-  books.push({
-    title: req.body.title,
-    author: req.body.author,
-    readStatus: req.body.readStatus,
-    id: new Date().getTime(),
-  });
-  res.send({ message: `${req.body.title} has been added` });
+exports.addBook = async (req, res, next) => {
+  if (!req.body.title && !req.body.author && !req.body.readStatus) {
+    return next(createError(400, "A title, author and readStatus is required"));
+  }
+  try {
+    const book = new Book({
+      title: req.body.title,
+      author: req.body.author,
+      readStatus: req.body.readStatus,
+    });
+    await book.save();
+    res.send({ message: `${book.title} has been added` });
+  } catch (error) {
+    return next(createError(500, error.message));
+  }
 };
 
 // Remove all books from the list
-exports.deleteAllBooks = (req, res, next) => {
-  books = [];
-  res.send({ message: `All books have been deleted` });
+exports.deleteAllBooks = async (req, res, next) => {
+  try {
+    await Book.deleteMany({});
+    res.send({ message: "All the books have been deleted" });
+  } catch (error) {
+    return next(createError(400, "Error deleting the books", error));
+  }
 };
 
 // Edit book listings
-// BUG
-exports.updateBook = (req, res, next) => {
+exports.updateBook = async (req, res, next) => {
   if (!req.body.title && !req.body.author && !req.body.readStatus) {
-    return next(createError(404, "Book details are required"));
+    return next(createError(400, "Book details are required"));
   }
 
-  const book = books.find((book) => book.id === parseInt(req.params.id));
-  if (!book) {
-    return next(createError(404, "No books found"));
+  try {
+    const book = await Book.findByIdAndUpdate(
+      req.params.id,
+      {
+        $set: {
+          title: req.body.title,
+          author: req.body.author,
+          readStatus: req.body.readStatus,
+        },
+      },
+      { new: true }
+    );
+
+    if (!book) {
+      return next(createError(404, "Book not found"));
+    }
+
+    res.send({ message: `${book.title} (ID: ${book.id}) has been updated` });
+  } catch (error) {
+    return next(createError(500, "Error updating the book", error));
   }
-
-  if (req.body.title) book.title = req.body.title;
-  if (req.body.author) book.author = req.body.author;
-  if (req.body.readStatus) book.readStatus = req.body.readStatus;
-
-  res.send({ message: `${book.title} (ID: ${book.id}) has been updated` });
 };
 
-// Return book listings
-exports.getBooks = (req, res, next) => {
-  if (books.length === 0) {
-    return next(createError(404, "No books found"));
+// Return book by ID
+exports.getBook = async (req, res, next) => {
+  try {
+    const book = await Book.findById(req.params.id);
+    if (!book) {
+      return next(createError(404, "Book not found"));
+    }
+    res.send(book);
+  } catch (error) {
+    return next(createError(500, error.message));
   }
-  res.send(books);
 };
 
-// Return books by ID
-exports.getBook = (req, res, next) => {
-  const book = books.find((book) => book.id === req.params.id);
-  if (!book) {
-    return next(createError(404, "Book not found"));
+// Delete book by ID
+exports.deleteBook = async (req, res, next) => {
+  try {
+    const book = await Book.findByIdAndRemove(req.params.id);
+    if (!book) {
+      return next(createError(404, "Book not found"));
+    }
+    res.send({ message: `${book.title} (ID: ${book.id}) has been deleted` });
+  } catch (error) {
+    return next(createError(500, error.message));
   }
-  res.send(book);
-};
-
-// Delete books by ID
-exports.deleteBook = (req, res, next) => {
-  const book = books.find((book) => book.id === parseInt(req.params.id));
-  if (!book) {
-    return next(createError(404, "Book not found"));
-  }
-  res.send({ message: `${book.title} (ID: ${book.id}) has been deleted` });
 };
