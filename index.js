@@ -4,6 +4,7 @@ const app = express();
 const port = process.env.PORT || 3000;
 const router = require("./router");
 const mongoose = require("mongoose");
+require("dotenv").config();
 
 try {
   const db = mongoose.connect(process.env.DB_URI, {
